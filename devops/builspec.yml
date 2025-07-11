@@ -6,11 +6,16 @@ phases:
       python: 3.9
   build:
     commands:
-      - cd src
-      - zip ../signup.zip signup.py
-      - zip ../login.zip login.py
-      - aws s3 cp ../signup.zip s3://$PIPELINE_BUCKET/
-      - aws s3 cp ../login.zip s3://$PIPELINE_BUCKET/
+      - pip install aws-sam-cli
+      - sam build
+      - sam package \
+          --s3-bucket $PIPELINE_BUCKET \
+          --output-template-file packaged.yaml
+      - sam deploy \
+          --template-file packaged.yaml \
+          --stack-name auth-sam-api \
+          --capabilities CAPABILITY_IAM
 artifacts:
   files:
-    - template.yaml
+    - packaged.yaml
+
