@@ -1,0 +1,16 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+  build:
+    commands:
+      - cd src
+      - zip ../signup.zip signup.py
+      - zip ../login.zip login.py
+      - aws s3 cp ../signup.zip s3://$PIPELINE_BUCKET/
+      - aws s3 cp ../login.zip s3://$PIPELINE_BUCKET/
+artifacts:
+  files:
+    - template.yaml

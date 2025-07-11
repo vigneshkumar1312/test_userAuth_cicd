@@ -1,0 +1,272 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CI/CD-enabled User Auth API using Lambda, API Gateway, DynamoDB, CodePipeline
+Parameters:
+  ResourcePrefix:
+    Type: String
+    Default: ""
+  Environment:
+    Type: String
+    Default: dev
+  GitHubRepo:
+    Type: String
+    Default: test-user-auth-cicd
+  GitHubOwner:
+    Type: String
+    Default: vigneshkumar
+  GitHubBranch:
+    Type: String
+    Default: main
+  CodeStarConnectionArn:
+    Type: String
+    Description: ARN of the CodeStar Connection for GitHub
+    NoEcho: true
+Resources:
+  # UsersTable:
+  #   Type: AWS::DynamoDB::Table
+  #   Properties:
+  #     TableName: test-vk-users
+  #     BillingMode: PAY_PER_REQUEST
+  #     AttributeDefinitions:
+  #     - AttributeName: userId
+  #       AttributeType: S
+  #     KeySchema:
+  #     - AttributeName: userId
+  #       KeyType: HASH
+  SignupFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      # FunctionName: test-vk-signup
+      FunctionName: !Join ['-', [!Ref ResourcePrefix, !Ref Environment, signup]]
+      Runtime: python3.9
+      Handler: signup.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaExecutionRole
+        - Arn
+      Code:
+        S3Bucket:
+          Ref: ArtifactBucket
+        S3Key: signup.zip
+      Environment:
+        Variables:
+          TABLE_NAME: test-vk-users
+  LoginFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Join ['-', [!Ref ResourcePrefix, !Ref Environment, login]]
+      Runtime: python3.9
+      Handler: login.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaExecutionRole
+        - Arn
+      Code:
+        S3Bucket:
+          Ref: ArtifactBucket
+        S3Key: login.zip
+      Environment:
+        Variables:
+          TABLE_NAME: test-vk-users
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: LambdaDynamoDBPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:*
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: TestUserAuthApi
+  SignupResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+        - ApiGateway
+        - RootResourceId
+      PathPart: signup
+      RestApiId:
+        Ref: ApiGateway
+  LoginResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+        - ApiGateway
+        - RootResourceId
+      PathPart: login
+      RestApiId:
+        Ref: ApiGateway
+  SignupMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: ApiGateway
+      ResourceId:
+        Ref: SignupResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+          - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - Region:
+              Ref: AWS::Region
+            LambdaArn:
+              Fn::GetAtt:
+              - SignupFunction
+              - Arn
+  LoginMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: ApiGateway
+      ResourceId:
+        Ref: LoginResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+          - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - Region:
+              Ref: AWS::Region
+            LambdaArn:
+              Fn::GetAtt:
+              - LoginFunction
+              - Arn
+  LambdaPermissionSignup:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: SignupFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+  LambdaPermissionLogin:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: LoginFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+  PipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: codepipeline.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: PipelinePolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action: '*'
+            Resource: '*'
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn:
+        Fn::GetAtt:
+        - PipelineRole
+        - Arn
+      ArtifactStore:
+        Type: S3
+        Location:
+          Ref: ArtifactBucket
+      Stages:
+      - Name: Source
+        Actions:
+        - Name: SourceAction
+          ActionTypeId:
+            Category: Source
+            Owner: AWS
+            Provider: CodeStarSourceConnection
+            Version: '1'
+          OutputArtifacts:
+          - Name: SourceArtifact
+          Configuration:
+            ConnectionArn:
+              Ref: CodeStarConnectionArn
+            FullRepositoryId:
+              Fn::Sub: ${GitHubOwner}/${GitHubRepo}
+            BranchName:
+              Ref: GitHubBranch
+            OutputArtifactFormat: CODE_ZIP
+      - Name: Build
+        Actions:
+        - Name: BuildAction
+          ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Provider: CodeBuild
+            Version: '1'
+          InputArtifacts:
+          - Name: SourceArtifact
+          OutputArtifacts:
+          - Name: BuildArtifact
+          Configuration:
+            ProjectName:
+              Ref: CodeBuildProject
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: UserAuthBuild
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:6.0
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+        - Name: AWS_REGION
+          Value:
+            Ref: AWS::Region
+      ServiceRole:
+        Fn::GetAtt:
+        - CodeBuildServiceRole
+        - Arn
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: test-vk-CodeBuildRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: codebuild.amazonaws.com
+          Action: sts:AssumeRole
