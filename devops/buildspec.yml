@@ -17,7 +17,7 @@ phases:
           --output-template-file packaged.yaml
       - sam deploy \
           --template-file packaged.yaml \
-          --stack-name auth-sam-api \
+          --stack-name test-auth-sam-api \
           --capabilities CAPABILITY_IAM
 artifacts:
   files:
