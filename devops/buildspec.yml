@@ -11,7 +11,7 @@ phases:
       - echo "Sam cli installed"
       - echo "Current dir:" && pwd
       - ls -al
-      - sam build -t template.yml
+      - sam build -t devops/template.yml
       - sam package \
           --s3-bucket $PIPELINE_BUCKET \
           --output-template-file packaged.yaml
