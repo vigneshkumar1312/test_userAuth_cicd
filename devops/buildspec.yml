@@ -6,8 +6,12 @@ phases:
       python: 3.9
   build:
     commands:
+      - echo "Installing sam cli"
       - pip install aws-sam-cli
-      - sam build
+      - echo "Sam cli installed"
+      - echo "Current dir:" && pwd
+      - ls -al
+      - sam build -t template.yml
       - sam package \
           --s3-bucket $PIPELINE_BUCKET \
           --output-template-file packaged.yaml
@@ -18,4 +22,5 @@ phases:
 artifacts:
   files:
     - packaged.yaml
+
 
