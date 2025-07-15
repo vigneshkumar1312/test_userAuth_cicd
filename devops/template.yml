@@ -13,9 +13,9 @@ Resources:
   SignupFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: signup-handler
+      FunctionName: learn-vk-signup-handler
       Handler: signup.lambda_handler
-      CodeUri: src/
+      CodeUri: ../src/
       Events:
         SignupAPI:
           Type: Api
@@ -26,9 +26,9 @@ Resources:
   LoginFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: login-handler
+      FunctionName: learn-vk-login-handler
       Handler: login.lambda_handler
-      CodeUri: src/
+      CodeUri: ../src/
       Events:
         LoginAPI:
           Type: Api
