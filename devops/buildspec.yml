@@ -6,17 +6,18 @@ phases:
       python: 3.9
   build:
     commands:
-      - echo "Installing sam cli"
+      - echo "Installing SAM CLI"
       - pip install aws-sam-cli
-      - echo "Sam cli installed"
-      - echo "Current dir:" && pwd
+      - echo "SAM CLI installed"
+      - echo "Current directory:" && pwd
       - ls -al
       - sam build -t devops/template.yml
-      - echo "Pipeline bucket name $PIPELINE_BUCKET"
+      - echo "Pipeline bucket name: $PIPELINE_BUCKET"
       - sam package --s3-bucket $PIPELINE_BUCKET --output-template-file packaged.yaml
-      - sam deploy --template-file packaged.yaml --stack-name test-auth-sam-api --capabilities CAPABILITY_IAM
+
 artifacts:
   files:
     - packaged.yaml
+
 
 
