@@ -12,7 +12,7 @@ phases:
       - echo "Current directory:" && pwd
       - ls -al
       - sam build -t devops/template.yml
-      - echo "Pipeline bucket name: $PIPELINE_BUCKET"
+      - echo "Pipeline bucket name $PIPELINE_BUCKET"
       - sam package --s3-bucket $PIPELINE_BUCKET --output-template-file packaged.yaml
 
 artifacts:
